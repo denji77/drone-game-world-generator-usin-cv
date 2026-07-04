@@ -1,0 +1,10 @@
+# Install PyTorch with CUDA FIRST (see README.md), e.g.:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+# then:
+#   pip install -r requirements.txt
+ultralytics>=8.3
+opencv-contrib-python>=4.9
+numpy>=1.26
+PyYAML>=6.0
+scenedetect>=0.6.4
+lapx>=0.5.2

@@ -1,0 +1,55 @@
+# Drone Video -> Unity pipeline config (plan v3 conventions: one clock, one frame index)
+input: video/drone.mp4           # your test video (any name; update this path)
+work_dir: out
+unity_project: UnityProject      # deploy target; Assets/Generated created if missing
+
+ingest:
+  split_on_cuts: true            # PySceneDetect; keeps the longest continuous shot
+  crop: null                     # e.g. "in_w:in_h-80:0:0" to remove a burned-in HUD, or null
+  border_crop_pct: 10            # lens-distortion mitigation (crop N% off every border); 0 disables
+  stride: 6                      # registration frames = every Nth VIDEO frame (30fps -> 5fps)
+  # video_fps is MEASURED by ffprobe at run time - an output of ingest, never an input
+
+detect:
+  model: yolo11m.pt              # auto-downloads on first run (~40 MB)
+  imgsz: 1920                    # inference size - the default 640 destroys 10-25 px people
+  device: auto                   # auto = cuda > mps > cpu; or 0 / "cpu"
+  conf: 0.25
+  dynamic_classes: [0, 1, 2, 3, 5, 7]   # COCO: person, bicycle, car, motorcycle, bus, truck
+  mask_dilate_px: 25             # swallow the moving-shadow fringe around each box
+  foot_shift: {person: 0.02, vehicle: 0.18}   # oblique-view foot-point correction (fraction of box height)
+
+geometry:
+  ref_frame: auto                # IGNORED once out/calibration.json exists - the binding wins
+  min_matches: 12
+  min_inliers: 15                # below this a frame counts as unregistered (-> interpolated)
+  reanchor_every: 25             # extracted frames between direct-to-reference re-anchor attempts
+  orb_features: 5000
+
+calibrate:
+  auto: car_size                 # 'car_size' | 'unscaled'; for METRIC scale run: python -m scripts.calibrate
+  ppm: 20                        # pixels-per-meter for the ground texture
+
+mosaic:
+  max_frames: 60                 # frames used for the median (evenly subsampled; 60 is plenty)
+  max_canvas_px: 6000            # cap texture size; ppm is reduced automatically if exceeded
+  tile: 512                      # tiled median keeps memory bounded regardless of canvas size
+  margin_m: 5
+
+map:
+  smooth_window: 5
+  max_gap_s: 0.5                 # split tracks on time gaps larger than this BEFORE smoothing
+  stitch_gaps: true              # rejoin segments that pass the max-speed gate
+  max_stitch_gap_s: 3.0
+  max_speed: {person: 3.0, vehicle: 15.0}   # m/s gate for stitching
+
+gates:
+  min_frames_registered_pct: 60
+  min_tracks: 1
+  max_blur_pct: 40               # % of frames allowed below blur_threshold
+  blur_threshold: 100.0          # Laplacian variance; below = blurry
+
+unity:
+  run_build: false               # true = launch Unity in batch mode after deploy (Unity must be installed)
+  build_player: false            # true = also build a runnable app (Build/app.exe), not just the scene
+  build_target: StandaloneWindows64
